@@ -1,0 +1,1798 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="HabitPulse">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" id="meta-theme-color" content="#0f172a">
+    <title>HabitPulse — Native Mobile Habit & Streak App</title>
+
+    <!-- Dynamic Inline SVG App Icon for iOS/Android Home Screen -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%234f46e5'/%3E%3Cstop offset='100%25' stop-color='%23ec4899'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='512' height='512' rx='128' fill='url(%23g)'/%3E%3Cpath d='M368 176L224 320l-80-80' fill='none' stroke='%23fff' stroke-width='48' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='128' fill='%234f46e5'/%3E%3Cpath d='M368 176L224 320l-80-80' fill='none' stroke='%23fff' stroke-width='48' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+    <link rel="manifest" id="pwa-manifest">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            400: '#818cf8',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        :root {
+            --sat: env(safe-area-inset-top, 0px);
+            --sab: env(safe-area-inset-bottom, 0px);
+        }
+        * {
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+            -webkit-user-select: none;
+            box-sizing: border-box;
+        }
+        input, textarea {
+            user-select: text;
+            -webkit-user-select: text;
+        }
+        html, body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            height: 100dvh;
+            width: 100vw;
+            overflow: hidden;
+            overscroll-behavior-y: none;
+            -webkit-font-smoothing: antialiased;
+        }
+        /* Hide scrollbars inside native scroll views */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        /* Native spring animations */
+        @keyframes checkPop {
+            0% { transform: scale(0.75); }
+            50% { transform: scale(1.18); }
+            100% { transform: scale(1); }
+        }
+        .animate-check {
+            animation: checkPop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        @keyframes sheetSlideUp {
+            from { transform: translateY(100%); opacity: 0.5; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        .sheet-enter {
+            animation: sheetSlideUp 0.32s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+        @keyframes viewFadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .view-animate {
+            animation: viewFadeIn 0.22s ease-out forwards;
+        }
+        /* Flame pulse animation */
+        @keyframes flamePulse {
+            0%, 100% { transform: scale(1) rotate(-2deg); }
+            50% { transform: scale(1.14) rotate(4deg); }
+        }
+        .flame-active {
+            display: inline-block;
+            animation: flamePulse 1.8s infinite ease-in-out;
+        }
+        /* Progress ring & Bar transitions */
+        .progress-ring-circle {
+            transition: stroke-dashoffset 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
+        }
+        .bar-fill {
+            transition: height 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        /* Active touch state */
+        .tap-scale:active {
+            transform: scale(0.96);
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-900 dark:text-slate-100 flex justify-center items-center sm:py-4 transition-colors duration-300">
+
+    <!-- Particle Confetti Canvas Overlay -->
+    <canvas id="confetti-canvas" class="fixed inset-0 pointer-events-none z-50"></canvas>
+
+    <!-- Native Mobile Device Frame (100% Fullscreen on Mobile, iPhone 15 Pro Frame on Desktop) -->
+    <div id="app-frame" class="w-full max-w-[430px] h-[100dvh] sm:h-[880px] sm:max-h-[94dvh] bg-slate-50 dark:bg-slate-900 sm:rounded-[48px] sm:shadow-[0_25px_70px_-15px_rgba(0,0,0,0.7)] sm:border-[10px] sm:border-slate-800/95 flex flex-col relative overflow-hidden transition-colors duration-300">
+
+        <!-- Simulated Native iOS/Android Status Bar & Dynamic Island (Visible on Desktop Frame, Safe-Area aware on Mobile) -->
+        <div class="shrink-0 bg-slate-50/90 dark:bg-slate-900/90 backdrop-blur-md px-6 pt-2.5 pb-1.5 flex items-center justify-between text-xs font-bold text-slate-800 dark:text-slate-200 z-30 select-none" style="padding-top: max(0.65rem, var(--sat));">
+            <div class="flex items-center gap-1.5 w-20">
+                <span id="status-bar-clock" class="tracking-tight font-extrabold">9:41</span>
+                <span id="pwa-badge" class="hidden px-1.5 py-0.2 bg-brand-500/20 text-brand-400 rounded text-[9px] font-extrabold uppercase">PWA</span>
+            </div>
+
+            <!-- Dynamic Island Pill (Desktop aesthetic) -->
+            <div class="hidden sm:flex items-center justify-center w-28 h-6 bg-black rounded-full px-2.5 gap-2 shadow-inner">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <div class="w-2.5 h-2.5 rounded-full bg-indigo-950 border border-indigo-800/60"></div>
+            </div>
+
+            <div class="flex items-center justify-end gap-1.5 w-20 text-slate-700 dark:text-slate-300">
+                <i class="ph-fill ph-cell-signal-full text-sm"></i>
+                <i class="ph-bold ph-wifi-high text-sm"></i>
+                <div class="flex items-center gap-0.5">
+                    <span class="text-[10px] font-bold">100%</span>
+                    <i class="ph-fill ph-battery-full text-base text-emerald-500"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sticky App Header & 7-Day Date Pill Selector -->
+        <header class="shrink-0 z-20 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-md px-4 pt-1 pb-3 border-b border-slate-200/70 dark:border-slate-800/80">
+            <div class="flex items-center justify-between mb-2.5">
+                <div>
+                    <div class="flex items-center gap-1.5">
+                        <span class="inline-block w-2 h-2 rounded-full bg-brand-500 animate-pulse"></span>
+                        <p id="header-date" class="text-[11px] font-bold uppercase tracking-wider text-brand-600 dark:text-brand-400">Today</p>
+                    </div>
+                    <h1 class="text-xl font-black tracking-tight text-slate-900 dark:text-white">HabitPulse</h1>
+                </div>
+
+                <!-- Quick Toggles: Sound, Theme, Install App -->
+                <div class="flex items-center gap-1.5">
+                    <button id="sound-toggle" onclick="toggleSound()" aria-label="Toggle Sound Effects" class="tap-scale w-9 h-9 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/70 flex items-center justify-center text-slate-600 dark:text-slate-300 shadow-xs transition">
+                        <i id="sound-icon" class="ph-fill ph-speaker-high text-lg text-brand-500"></i>
+                    </button>
+                    <button id="theme-toggle" onclick="toggleTheme()" aria-label="Toggle Theme" class="tap-scale w-9 h-9 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/70 flex items-center justify-center text-slate-600 dark:text-slate-300 shadow-xs transition">
+                        <i id="theme-icon" class="ph-fill ph-sun text-lg text-amber-400"></i>
+                    </button>
+                    <button onclick="openInstallSheet()" aria-label="Install App" class="tap-scale px-2.5 h-9 rounded-2xl bg-brand-600/10 dark:bg-brand-500/15 border border-brand-500/30 flex items-center gap-1 text-brand-600 dark:text-brand-400 text-xs font-extrabold shadow-xs transition">
+                        <i class="ph-bold ph-download-simple text-sm"></i>
+                        <span class="hidden xs:inline">App</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Interactive 7-Day Horizontal Date Selector Pill Strip -->
+            <div class="bg-slate-100/90 dark:bg-slate-800/70 rounded-2xl p-1.5 border border-slate-200/60 dark:border-slate-800">
+                <div class="flex items-center justify-between px-1.5 mb-1">
+                    <span class="text-[11px] font-bold text-slate-500 dark:text-slate-400" id="active-date-label">Logging for Today</span>
+                    <button id="reset-to-today-btn" onclick="selectDayIndex(6)" class="hidden text-[11px] font-extrabold text-brand-600 dark:text-brand-400 flex items-center gap-0.5">
+                        <i class="ph-bold ph-arrow-counter-clockwise"></i> Jump to Today
+                    </button>
+                </div>
+                <div class="grid grid-cols-7 gap-1" id="mini-week-strip">
+                    <!-- Dynamically populated 7 days -->
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Native Scrollable Viewport -->
+        <main id="main-scroll" class="flex-1 overflow-y-auto no-scrollbar px-4 pt-3.5 pb-28 space-y-4">
+
+            <!-- ==================== TAB 1: TODAY'S HABITS ==================== -->
+            <section id="view-today" class="view-animate space-y-4">
+                <!-- Animated Daily Completion Ring Hero Card -->
+                <div class="bg-gradient-to-br from-brand-600 via-indigo-600 to-purple-700 rounded-3xl p-4 text-white shadow-lg shadow-brand-600/25 flex items-center justify-between relative overflow-hidden">
+                    <div class=" -right-6 -bottom-6 w-28 h-28 rounded-full bg-white/5 pointer-events-none absolute"></div>
+                    <div class="space-y-1 pr-2 z-10">
+                        <div class="flex items-center gap-1.5">
+                            <span id="daily-status-badge" class="text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-white/20 backdrop-blur-xs">In Progress</span>
+                            <span id="overall-streak-pill" class="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-400/25 text-amber-200 flex items-center gap-1">
+                                🔥 <span id="hero-best-streak">0</span>d Best
+                            </span>
+                        </div>
+                        <p id="daily-motivation" class="text-sm font-extrabold text-white leading-snug pt-0.5">Keep your momentum going!</p>
+                        <p id="daily-count-subtext" class="text-xs text-indigo-100/90 font-medium">0 of 5 habits completed today</p>
+                    </div>
+
+                    <!-- Circular SVG Progress Ring -->
+                    <div class="relative w-16 h-16 flex items-center justify-center shrink-0 z-10">
+                        <svg class="w-16 h-16" viewBox="0 0 64 64">
+                            <circle class="text-white/20" stroke-width="6" stroke="currentColor" fill="transparent" r="26" cx="32" cy="32"/>
+                            <circle id="header-progress-ring" class="progress-ring-circle text-white" stroke-width="6" stroke-dasharray="163.36" stroke-dashoffset="163.36" stroke-linecap="round" stroke="currentColor" fill="transparent" r="26" cx="32" cy="32"/>
+                        </svg>
+                        <span id="header-progress-text" class="absolute text-sm font-black tracking-tight">0%</span>
+                    </div>
+                </div>
+
+                <!-- Categorized Filter Pills -->
+                <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5" id="category-filters">
+                    <!-- Dynamically populated -->
+                </div>
+
+                <!-- Section Subheader -->
+                <div class="flex items-center justify-between px-0.5">
+                    <div class="flex items-center gap-2">
+                        <h2 class="text-sm font-extrabold text-slate-800 dark:text-slate-100">Daily Goals</h2>
+                        <span id="filtered-count-badge" class="px-2 py-0.5 text-[10px] font-extrabold rounded-full bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400">5</span>
+                    </div>
+                    <button onclick="openHabitModal()" class="tap-scale text-xs font-extrabold text-brand-600 dark:text-brand-400 flex items-center gap-1">
+                        <i class="ph-bold ph-plus-circle text-sm"></i> Add Goal
+                    </button>
+                </div>
+
+                <!-- Interactive Habit Cards with Mini 7-Day Dots & Custom Emojis -->
+                <div id="habits-list" class="space-y-2.5">
+                    <!-- Dynamically populated habit cards -->
+                </div>
+            </section>
+
+            <!-- ==================== TAB 2: WEEKLY STREAK CHART & MATRIX ==================== -->
+            <section id="view-weekly" class="hidden view-animate space-y-4">
+                <!-- Weekly Streak Summary Banner -->
+                <div class="grid grid-cols-3 gap-2">
+                    <div class="bg-white dark:bg-slate-800/90 p-3 rounded-2xl border border-slate-200/70 dark:border-slate-800 shadow-xs">
+                        <span class="text-[10px] font-bold uppercase text-slate-400">Weekly Avg</span>
+                        <p id="weekly-avg-badge" class="text-lg font-black text-brand-600 dark:text-brand-400 mt-0.5">0%</p>
+                    </div>
+                    <div class="bg-white dark:bg-slate-800/90 p-3 rounded-2xl border border-slate-200/70 dark:border-slate-800 shadow-xs">
+                        <span class="text-[10px] font-bold uppercase text-slate-400">Best Day</span>
+                        <p id="weekly-best-day" class="text-lg font-black text-emerald-500 mt-0.5">Today</p>
+                    </div>
+                    <div class="bg-white dark:bg-slate-800/90 p-3 rounded-2xl border border-slate-200/70 dark:border-slate-800 shadow-xs">
+                        <span class="text-[10px] font-bold uppercase text-slate-400">Top Streak</span>
+                        <p id="weekly-top-streak" class="text-lg font-black text-orange-500 mt-0.5">🔥 0d</p>
+                    </div>
+                </div>
+
+                <!-- Interactive 7-Day Bar Chart Card -->
+                <div class="bg-white dark:bg-slate-800/90 rounded-3xl p-4 border border-slate-200/70 dark:border-slate-800 shadow-xs">
+                    <div class="flex items-center justify-between mb-3">
+                        <div>
+                            <h2 class="text-sm font-extrabold text-slate-900 dark:text-white">7-Day Completion Chart</h2>
+                            <p class="text-[11px] text-slate-500 dark:text-slate-400">Tap any bar to inspect or log that day</p>
+                        </div>
+                        <span class="px-2 py-1 rounded-lg bg-emerald-500/10 text-emerald-500 text-[10px] font-extrabold uppercase">Interactive</span>
+                    </div>
+
+                    <!-- 7-Day Vertical Bar Chart -->
+                    <div id="weekly-bar-chart" class="h-40 flex items-end justify-between gap-2 pt-5 pb-1 px-1 border-b border-slate-100 dark:border-slate-700/60">
+                        <!-- Bars injected via JS -->
+                    </div>
+                    <div id="weekly-bar-labels" class="grid grid-cols-7 gap-2 pt-2 text-center">
+                        <!-- Day labels injected via JS -->
+                    </div>
+                </div>
+
+                <!-- Interactive 7-Day Habit Matrix Grid -->
+                <div class="bg-white dark:bg-slate-800/90 rounded-3xl p-4 border border-slate-200/70 dark:border-slate-800 shadow-xs">
+                    <div class="flex items-center justify-between mb-3">
+                        <div>
+                            <h2 class="text-sm font-extrabold text-slate-900 dark:text-white">Weekly Habit Matrix</h2>
+                            <p class="text-[11px] text-slate-500 dark:text-slate-400">Tap any cell to toggle completion directly</p>
+                        </div>
+                        <i class="ph-duotone ph-grid-four text-xl text-brand-500"></i>
+                    </div>
+
+                    <div class="overflow-x-auto no-scrollbar">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr id="matrix-header-row" class="border-b border-slate-100 dark:border-slate-700/60 text-[10px] font-extrabold text-slate-400 dark:text-slate-500 uppercase">
+                                    <!-- Populated by JS -->
+                                </tr>
+                            </thead>
+                            <tbody id="matrix-body" class="divide-y divide-slate-100 dark:divide-slate-700/40 text-sm">
+                                <!-- Populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==================== TAB 3: ANALYTICS & INSIGHTS ==================== -->
+            <section id="view-stats" class="hidden view-animate space-y-4">
+                <!-- 3 Key Summary Cards -->
+                <div class="grid grid-cols-3 gap-2.5">
+                    <div class="bg-white dark:bg-slate-800/90 p-3.5 rounded-2xl border border-slate-200/70 dark:border-slate-800 shadow-xs flex flex-col justify-between">
+                        <div class="w-8 h-8 rounded-xl bg-orange-500/10 text-orange-500 flex items-center justify-center mb-2">
+                            <i class="ph-fill ph-fire text-lg"></i>
+                        </div>
+                        <div>
+                            <p id="stat-best-streak" class="text-xl font-black text-slate-900 dark:text-white">0d</p>
+                            <p class="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5">Best Streak</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-white dark:bg-slate-800/90 p-3.5 rounded-2xl border border-slate-200/70 dark:border-slate-800 shadow-xs flex flex-col justify-between">
+                        <div class="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center mb-2">
+                            <i class="ph-fill ph-chart-line-up text-lg"></i>
+                        </div>
+                        <div>
+                            <p id="stat-weekly-rate" class="text-xl font-black text-slate-900 dark:text-white">0%</p>
+                            <p class="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5">7-Day Score</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-white dark:bg-slate-800/90 p-3.5 rounded-2xl border border-slate-200/70 dark:border-slate-800 shadow-xs flex flex-col justify-between">
+                        <div class="w-8 h-8 rounded-xl bg-brand-500/10 text-brand-500 flex items-center justify-center mb-2">
+                            <i class="ph-fill ph-check-circle text-lg"></i>
+                        </div>
+                        <div>
+                            <p id="stat-total-done" class="text-xl font-black text-slate-900 dark:text-white">0</p>
+                            <p class="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5">Total Check-ins</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Habit Target Consistency Breakdown -->
+                <div class="bg-white dark:bg-slate-800/90 rounded-3xl p-4 border border-slate-200/70 dark:border-slate-800 shadow-xs space-y-3.5">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h2 class="text-sm font-extrabold text-slate-900 dark:text-white">Weekly Goal Targets</h2>
+                            <p class="text-[11px] text-slate-500 dark:text-slate-400">Progress toward each habit's weekly frequency</p>
+                        </div>
+                        <i class="ph-duotone ph-target text-xl text-brand-500"></i>
+                    </div>
+                    <div id="stats-habit-breakdown" class="space-y-3">
+                        <!-- Populated via JS -->
+                    </div>
+                </div>
+
+                <!-- Category Performance -->
+                <div class="bg-white dark:bg-slate-800/90 rounded-3xl p-4 border border-slate-200/70 dark:border-slate-800 shadow-xs space-y-3">
+                    <h2 class="text-sm font-extrabold text-slate-900 dark:text-white">Category Breakdown</h2>
+                    <div id="stats-category-list" class="grid grid-cols-2 gap-2">
+                        <!-- Populated via JS -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==================== TAB 4: NATIVE APP SETTINGS & PWA ==================== -->
+            <section id="view-settings" class="hidden view-animate space-y-4">
+                <!-- Install PWA Banner Card -->
+                <div class="bg-gradient-to-r from-indigo-600 to-brand-600 rounded-3xl p-4 text-white shadow-lg shadow-brand-600/20">
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="space-y-1">
+                            <span class="px-2 py-0.5 rounded-full bg-white/20 text-[10px] font-extrabold uppercase tracking-wider">Progressive Web App</span>
+                            <h2 class="text-base font-black pt-0.5">Install HabitPulse on Home Screen</h2>
+                            <p class="text-xs text-indigo-100 leading-relaxed">Launch full-screen with zero browser bars, offline support, and instant native feel on iOS & Android.</p>
+                        </div>
+                        <div class="w-12 h-12 rounded-2xl bg-white/15 flex items-center justify-center shrink-0 text-2xl">
+                            📱
+                        </div>
+                    </div>
+                    <button onclick="openInstallSheet()" class="tap-scale mt-3 w-full py-2.5 rounded-xl bg-white text-brand-700 font-extrabold text-xs shadow-sm flex items-center justify-center gap-1.5">
+                        <i class="ph-bold ph-download-simple text-sm"></i> View Install / Home Screen Guide
+                    </button>
+                </div>
+
+                <!-- App Preferences (Sound, Haptics, Daily Reminder) -->
+                <div class="bg-white dark:bg-slate-800/90 rounded-3xl p-4 border border-slate-200/70 dark:border-slate-800 shadow-xs space-y-3">
+                    <h3 class="text-xs font-extrabold uppercase tracking-wider text-slate-400">App Experience & Feedback</h3>
+
+                    <!-- Sound Effects Toggle -->
+                    <div class="flex items-center justify-between py-1.5">
+                        <div class="flex items-center gap-3">
+                            <div class="w-9 h-9 rounded-xl bg-brand-500/10 text-brand-500 flex items-center justify-center">
+                                <i class="ph-fill ph-speaker-high text-lg"></i>
+                            </div>
+                            <div>
+                                <p class="text-xs font-bold text-slate-800 dark:text-slate-100">Synthesized Sound Effects</p>
+                                <p class="text-[11px] text-slate-500 dark:text-slate-400">Chime on habit check-off & completion</p>
+                            </div>
+                        </div>
+                        <button id="pref-sound-btn" onclick="toggleSound()" class="w-12 h-7 rounded-full bg-brand-600 p-1 transition-colors flex items-center justify-end">
+                            <span class="w-5 h-5 rounded-full bg-white shadow-xs transition-transform"></span>
+                        </button>
+                    </div>
+
+                    <!-- Haptic Vibration Toggle -->
+                    <div class="flex items-center justify-between py-1.5 border-t border-slate-100 dark:border-slate-700/50">
+                        <div class="flex items-center gap-3">
+                            <div class="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
+                                <i class="ph-fill ph-vibrate text-lg"></i>
+                            </div>
+                            <div>
+                                <p class="text-xs font-bold text-slate-800 dark:text-slate-100">Haptic Touch Vibration</p>
+                                <p class="text-[11px] text-slate-500 dark:text-slate-400">Tactile pulse on supported mobile devices</p>
+                            </div>
+                        </div>
+                        <button id="pref-haptic-btn" onclick="toggleHaptics()" class="w-12 h-7 rounded-full bg-brand-600 p-1 transition-colors flex items-center justify-end">
+                            <span class="w-5 h-5 rounded-full bg-white shadow-xs transition-transform"></span>
+                        </button>
+                    </div>
+
+                    <!-- Custom Daily Reminder Time -->
+                    <div class="flex items-center justify-between py-1.5 border-t border-slate-100 dark:border-slate-700/50">
+                        <div class="flex items-center gap-3">
+                            <div class="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center">
+                                <i class="ph-fill ph-bell-ringing text-lg"></i>
+                            </div>
+                            <div>
+                                <p class="text-xs font-bold text-slate-800 dark:text-slate-100">Daily Goal Reminder</p>
+                                <p class="text-[11px] text-slate-500 dark:text-slate-400">Evening nudge to keep your streak alive</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <input id="reminder-time-input" type="time" value="20:00" onchange="saveReminderTime()" class="px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-700 text-xs font-bold text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-600">
+                            <button id="pref-reminder-btn" onclick="toggleReminder()" class="w-12 h-7 rounded-full bg-slate-300 dark:bg-slate-700 p-1 transition-colors flex items-center justify-start">
+                                <span class="w-5 h-5 rounded-full bg-white shadow-xs transition-transform"></span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Actions & Data Backup / Restore (JSON) -->
+                <div class="bg-white dark:bg-slate-800/90 rounded-3xl p-4 border border-slate-200/70 dark:border-slate-800 shadow-xs space-y-2.5">
+                    <h3 class="text-xs font-extrabold uppercase tracking-wider text-slate-400 mb-1">Data Backup & Quick Actions</h3>
+
+                    <button onclick="completeAllToday()" class="tap-scale w-full p-3 rounded-2xl bg-emerald-500/10 hover:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-between font-bold text-xs transition">
+                        <span class="flex items-center gap-2.5"><i class="ph-fill ph-sparkle text-base"></i> Complete All Habits for Selected Day</span>
+                        <i class="ph-bold ph-caret-right"></i>
+                    </button>
+
+                    <div class="grid grid-cols-2 gap-2 pt-1">
+                        <button onclick="exportDataJSON()" class="tap-scale p-3 rounded-2xl bg-slate-100 dark:bg-slate-700/60 text-slate-700 dark:text-slate-200 flex items-center justify-center gap-2 font-bold text-xs transition">
+                            <i class="ph-bold ph-export text-base text-brand-500"></i> Export JSON
+                        </button>
+                        <label class="tap-scale p-3 rounded-2xl bg-slate-100 dark:bg-slate-700/60 text-slate-700 dark:text-slate-200 flex items-center justify-center gap-2 font-bold text-xs cursor-pointer transition">
+                            <i class="ph-bold ph-import text-base text-emerald-500"></i> Import JSON
+                            <input type="file" accept=".json,application/json" onchange="importDataJSON(event)" class="hidden">
+                        </label>
+                    </div>
+
+                    <button onclick="resetDemoData()" class="tap-scale w-full p-3 rounded-2xl bg-rose-500/10 hover:bg-rose-500/15 text-rose-600 dark:text-rose-400 flex items-center justify-between font-bold text-xs transition">
+                        <span class="flex items-center gap-2.5"><i class="ph-fill ph-arrows-counter-clockwise text-base"></i> Reset to Default 7-Day Demo Data</span>
+                        <i class="ph-bold ph-caret-right"></i>
+                    </button>
+                </div>
+            </section>
+
+        </main>
+
+        <!-- Native Bottom Tab Bar with Raised Center FAB & Home Indicator Bar -->
+        <nav class="shrink-0 z-20 bg-white/95 dark:bg-slate-900/95 backdrop-blur-lg border-t border-slate-200/80 dark:border-slate-800/90 px-4 pt-1.5 pb-2 flex flex-col" style="padding-bottom: max(0.5rem, var(--sab));">
+            <div class="flex items-center justify-between">
+                <button onclick="switchTab('today')" id="nav-today" class="tap-scale flex-1 flex flex-col items-center gap-0.5 py-1 rounded-2xl text-brand-600 dark:text-brand-400 font-extrabold transition">
+                    <i class="ph-fill ph-check-square-offset text-2xl"></i>
+                    <span class="text-[10px]">Today</span>
+                </button>
+
+                <button onclick="switchTab('weekly')" id="nav-weekly" class="tap-scale flex-1 flex flex-col items-center gap-0.5 py-1 rounded-2xl text-slate-400 dark:text-slate-500 font-semibold transition">
+                    <i class="ph ph-chart-bar text-2xl"></i>
+                    <span class="text-[10px]">Weekly</span>
+                </button>
+
+                <!-- Center Floating Action Button (FAB) -->
+                <div class="-mt-6 px-2">
+                    <button onclick="openHabitModal()" aria-label="New Habit" class="tap-scale w-14 h-14 rounded-full bg-gradient-to-tr from-brand-600 via-indigo-500 to-purple-500 text-white shadow-xl shadow-brand-500/40 flex items-center justify-center ring-4 ring-white dark:ring-slate-900 transition">
+                        <i class="ph-bold ph-plus text-2xl"></i>
+                    </button>
+                </div>
+
+                <button onclick="switchTab('stats')" id="nav-stats" class="tap-scale flex-1 flex flex-col items-center gap-0.5 py-1 rounded-2xl text-slate-400 dark:text-slate-500 font-semibold transition">
+                    <i class="ph ph-medal text-2xl"></i>
+                    <span class="text-[10px]">Analytics</span>
+                </button>
+
+                <button onclick="switchTab('settings')" id="nav-settings" class="tap-scale flex-1 flex flex-col items-center gap-0.5 py-1 rounded-2xl text-slate-400 dark:text-slate-500 font-semibold transition">
+                    <i class="ph ph-gear-six text-2xl"></i>
+                    <span class="text-[10px]">App</span>
+                </button>
+            </div>
+
+            <!-- Simulated Native iOS Home Indicator Pill -->
+            <div class="w-32 h-1 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto mt-2"></div>
+        </nav>
+
+        <!-- ==================== BOTTOM SHEET 1: ADD / EDIT HABIT ==================== -->
+        <div id="habit-modal" onclick="handleBackdropClick(event, 'habit-modal')" class="absolute inset-0 z-40 hidden flex items-end justify-center bg-slate-950/60 backdrop-blur-xs">
+            <div class="sheet-enter w-full bg-white dark:bg-slate-900 rounded-t-[32px] px-5 pt-3 pb-6 border-t border-slate-200 dark:border-slate-800 shadow-2xl space-y-4 max-h-[88%] overflow-y-auto no-scrollbar">
+                <!-- Native Bottom Sheet Drag Handle -->
+                <div class="w-10 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto mb-1"></div>
+
+                <div class="flex items-center justify-between">
+                    <h3 id="modal-title" class="text-base font-black text-slate-900 dark:text-white">New Daily Habit</h3>
+                    <button onclick="closeHabitModal()" class="tap-scale w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 flex items-center justify-center">
+                        <i class="ph-bold ph-x"></i>
+                    </button>
+                </div>
+
+                <form id="habit-form" onsubmit="saveHabitForm(event)" class="space-y-3.5">
+                    <input type="hidden" id="habit-id-input">
+
+                    <div>
+                        <label class="block text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Habit Goal Title</label>
+                        <input id="habit-name-input" type="text" required maxlength="42" placeholder="e.g., 20m Morning Yoga & Stretch" class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2.5">
+                        <div>
+                            <label class="block text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Category</label>
+                            <select id="habit-category-input" class="w-full px-3 py-2.5 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500">
+                                <option value="Fitness">Fitness</option>
+                                <option value="Health">Health</option>
+                                <option value="Mindfulness">Mindfulness</option>
+                                <option value="Work/Skill">Work/Skill</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Target Days / Wk</label>
+                            <select id="habit-target-input" class="w-full px-3 py-2.5 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500">
+                                <option value="7">Every day (7d/wk)</option>
+                                <option value="6">6 days / week</option>
+                                <option value="5">5 days / week</option>
+                                <option value="4">4 days / week</option>
+                                <option value="3">3 days / week</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Emoji Picker -->
+                    <div>
+                        <label class="block text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Choose Emoji Badge</label>
+                        <div id="emoji-picker-grid" class="grid grid-cols-6 gap-2">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+
+                    <!-- Accent Color Picker -->
+                    <div>
+                        <label class="block text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Card Color Accent</label>
+                        <div id="color-picker-grid" class="flex items-center justify-between gap-2 pt-0.5">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-2 pt-2">
+                        <button type="button" id="delete-habit-btn" onclick="handleDeleteCurrentHabit()" class="hidden tap-scale px-4 py-3 rounded-2xl bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 font-extrabold text-sm transition">
+                            <i class="ph-bold ph-trash text-lg"></i>
+                        </button>
+                        <button type="button" onclick="closeHabitModal()" class="tap-scale flex-1 py-3 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-extrabold text-xs">Cancel</button>
+                        <button type="submit" class="tap-scale flex-1 py-3 rounded-2xl bg-brand-600 hover:bg-brand-500 text-white font-extrabold text-xs shadow-lg shadow-brand-600/30">Save Habit</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- ==================== BOTTOM SHEET 2: INSTALL PWA / ADD TO HOME SCREEN GUIDE ==================== -->
+        <div id="install-modal" onclick="handleBackdropClick(event, 'install-modal')" class="absolute inset-0 z-40 hidden flex items-end justify-center bg-slate-950/60 backdrop-blur-xs">
+            <div class="sheet-enter w-full bg-white dark:bg-slate-900 rounded-t-[32px] px-5 pt-3 pb-6 border-t border-slate-200 dark:border-slate-800 shadow-2xl space-y-4">
+                <div class="w-10 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto mb-1"></div>
+
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-brand-600 to-pink-500 flex items-center justify-center text-white text-xl font-black shadow-md">
+                            ✓
+                        </div>
+                        <div>
+                            <h3 class="text-base font-black text-slate-900 dark:text-white">Install HabitPulse App</h3>
+                            <p class="text-[11px] text-slate-500 dark:text-slate-400">Full-screen native PWA experience</p>
+                        </div>
+                    </div>
+                    <button onclick="closeInstallSheet()" class="tap-scale w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 flex items-center justify-center">
+                        <i class="ph-bold ph-x"></i>
+                    </button>
+                </div>
+
+                <!-- Native Install Prompt Button if Browser Supports beforeinstallprompt -->
+                <button id="native-pwa-install-btn" onclick="triggerNativeInstall()" class="hidden tap-scale w-full py-3 rounded-2xl bg-emerald-500 text-white font-extrabold text-xs shadow-lg shadow-emerald-500/30 flex items-center justify-center gap-2">
+                    <i class="ph-bold ph-download-simple text-base"></i> Install Directly Now
+                </button>
+
+                <div class="space-y-2.5 text-xs">
+                    <div class="p-3 rounded-2xl bg-slate-100 dark:bg-slate-800/80 flex items-start gap-3">
+                        <i class="ph-fill ph-apple-logo text-xl text-slate-800 dark:text-white shrink-0 mt-0.5"></i>
+                        <div>
+                            <p class="font-extrabold text-slate-900 dark:text-white">iOS / iPhone Safari</p>
+                            <p class="text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed">
+                                Tap the <strong class="text-brand-500">Share</strong> button <i class="ph-bold ph-export"></i> at the bottom of Safari, then scroll and select <strong class="text-slate-800 dark:text-slate-200">"Add to Home Screen"</strong>.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="p-3 rounded-2xl bg-slate-100 dark:bg-slate-800/80 flex items-start gap-3">
+                        <i class="ph-fill ph-android-logo text-xl text-emerald-500 shrink-0 mt-0.5"></i>
+                        <div>
+                            <p class="font-extrabold text-slate-900 dark:text-white">Android Chrome</p>
+                            <p class="text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed">
+                                Tap the <strong class="text-brand-500">Three-Dot Menu (⋮)</strong> in Chrome and tap <strong class="text-slate-800 dark:text-slate-200">"Install App"</strong> or <strong class="text-slate-800 dark:text-slate-200">"Add to Home screen"</strong>.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <button onclick="closeInstallSheet()" class="tap-scale w-full py-3 rounded-2xl bg-brand-600 text-white font-extrabold text-xs">Got It</button>
+            </div>
+        </div>
+
+        <!-- Floating Native Toast Pill -->
+        <div id="toast" class="absolute bottom-20 left-1/2 -translate-x-1/2 z-50 pointer-events-none opacity-0 transition-all duration-300 translate-y-2">
+            <div class="bg-slate-900/95 dark:bg-white/95 backdrop-blur-md text-white dark:text-slate-900 px-4 py-2 rounded-full shadow-xl text-xs font-extrabold flex items-center gap-2 whitespace-nowrap border border-white/10">
+                <i class="ph-fill ph-check-circle text-emerald-400 dark:text-emerald-600 text-base"></i>
+                <span id="toast-msg">Saved!</span>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        /**************************************************************
+         * 1. INLINE PWA MANIFEST & NATIVE APP SHELL SETUP
+         **************************************************************/
+        let deferredInstallPrompt = null;
+
+        function initPWAManifest() {
+            const manifestObj = {
+                name: "HabitPulse — Daily Goals & Streak Tracker",
+                short_name: "HabitPulse",
+                description: "Native mobile habit tracker and weekly streak dashboard.",
+                start_url: "./",
+                display: "standalone",
+                orientation: "portrait",
+                background_color: "#0f172a",
+                theme_color: "#4f46e5",
+                icons: [
+                    {
+                        src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='128' fill='%234f46e5'/%3E%3Cpath d='M368 176L224 320l-80-80' fill='none' stroke='%23fff' stroke-width='48' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E",
+                        sizes: "512x512",
+                        type: "image/svg+xml",
+                        purpose: "any maskable"
+                    }
+                ]
+            };
+            const stringManifest = JSON.stringify(manifestObj);
+            const blob = new Blob([stringManifest], { type: 'application/json' });
+            const manifestURL = URL.createObjectURL(blob);
+            document.getElementById('pwa-manifest').setAttribute('href', manifestURL);
+
+            // Detect standalone mode
+            if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) {
+                document.getElementById('pwa-badge').classList.remove('hidden');
+            }
+
+            window.addEventListener('beforeinstallprompt', (e) => {
+                e.preventDefault();
+                deferredInstallPrompt = e;
+                document.getElementById('native-pwa-install-btn').classList.remove('hidden');
+            });
+        }
+
+        async function triggerNativeInstall() {
+            if (!deferredInstallPrompt) return;
+            deferredInstallPrompt.prompt();
+            const { outcome } = await deferredInstallPrompt.userChoice;
+            if (outcome === 'accepted') {
+                showToast('HabitPulse installed!');
+                closeInstallSheet();
+            }
+            deferredInstallPrompt = null;
+        }
+
+        function updateStatusBarClock() {
+            const now = new Date();
+            const hours = now.getHours();
+            const mins = String(now.getMinutes()).padStart(2, '0');
+            const formattedHours = hours % 12 || 12;
+            const clockEl = document.getElementById('status-bar-clock');
+            if (clockEl) clockEl.textContent = `${formattedHours}:${mins}`;
+        }
+
+        /**************************************************************
+         * 2. SYNTHESIZED WEB AUDIO SOUND & HAPTICS ENGINE
+         **************************************************************/
+        let audioCtx = null;
+        let prefs = {
+            sound: true,
+            haptics: true,
+            reminderEnabled: false,
+            reminderTime: "20:00"
+        };
+
+        function triggerHaptic(pattern = 18) {
+            if (prefs.haptics && typeof navigator !== 'undefined' && navigator.vibrate) {
+                try { navigator.vibrate(pattern); } catch (e) {}
+            }
+        }
+
+        function playSoundEffect(type = 'check') {
+            if (!prefs.sound) return;
+            try {
+                if (!audioCtx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    audioCtx = new AudioContext();
+                }
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+
+                const now = audioCtx.currentTime;
+                if (type === 'check') {
+                    // Crisp two-tone ascending pop chime
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(520, now);
+                    osc.frequency.exponentialRampToValueAtTime(880, now + 0.11);
+                    gain.gain.setValueAtTime(0.14, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.15);
+                } else if (type === 'uncheck') {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(400, now);
+                    osc.frequency.exponentialRampToValueAtTime(240, now + 0.09);
+                    gain.gain.setValueAtTime(0.1, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.11);
+                } else if (type === 'fanfare') {
+                    // 100% Daily completion chord
+                    [523.25, 659.25, 783.99, 1046.5].forEach((freq, idx) => {
+                        const osc = audioCtx.createOscillator();
+                        const gain = audioCtx.createGain();
+                        osc.type = 'triangle';
+                        osc.frequency.setValueAtTime(freq, now + idx * 0.055);
+                        gain.gain.setValueAtTime(0.12, now + idx * 0.055);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.055 + 0.35);
+                        osc.connect(gain);
+                        gain.connect(audioCtx.destination);
+                        osc.start(now + idx * 0.055);
+                        osc.stop(now + idx * 0.055 + 0.36);
+                    });
+                }
+            } catch (e) {}
+        }
+
+        /**************************************************************
+         * 3. STATE, CONSTANTS & ROLLING 7-DAY DATES
+         **************************************************************/
+        const STORAGE_KEY = 'habitpulse_pwa_v2';
+        const PREFS_KEY = 'habitpulse_prefs_v2';
+        const THEME_KEY = 'habitpulse_theme_v2';
+
+        const AVAILABLE_EMOJIS = [
+            '🏋️', '🧘', '💧', '📖', '🎨', '🧠',
+            '🏃', '🥗', '💤', '💻', '🎸', '🌿'
+        ];
+
+        const ACCENT_COLORS = {
+            indigo:  { name: 'Indigo',  bg: 'bg-indigo-500/12',  text: 'text-indigo-600 dark:text-indigo-400',  border: 'border-indigo-500/25',  bar: 'bg-indigo-500',  ring: 'ring-indigo-500' },
+            rose:    { name: 'Rose',    bg: 'bg-rose-500/12',    text: 'text-rose-600 dark:text-rose-400',      border: 'border-rose-500/25',    bar: 'bg-rose-500',    ring: 'ring-rose-500' },
+            emerald: { name: 'Emerald', bg: 'bg-emerald-500/12', text: 'text-emerald-600 dark:text-emerald-400',border: 'border-emerald-500/25', bar: 'bg-emerald-500', ring: 'ring-emerald-500' },
+            amber:   { name: 'Amber',   bg: 'bg-amber-500/12',   text: 'text-amber-600 dark:text-amber-400',    border: 'border-amber-500/25',   bar: 'bg-amber-500',   ring: 'ring-amber-500' },
+            sky:     { name: 'Sky',     bg: 'bg-sky-500/12',     text: 'text-sky-600 dark:text-sky-400',        border: 'border-sky-500/25',     bar: 'bg-sky-500',     ring: 'ring-sky-500' },
+            purple:  { name: 'Purple',  bg: 'bg-purple-500/12',  text: 'text-purple-600 dark:text-purple-400',  border: 'border-purple-500/25',  bar: 'bg-purple-500',  ring: 'ring-purple-500' }
+        };
+
+        function formatDateISO(dateObj) {
+            const year = dateObj.getFullYear();
+            const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+            const day = String(dateObj.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        function getPastISO(daysAgo) {
+            const d = new Date();
+            d.setDate(d.getDate() - daysAgo);
+            return formatDateISO(d);
+        }
+
+        function getRollingSevenDays() {
+            const days = [];
+            const today = new Date();
+            for (let i = 6; i >= 0; i--) {
+                const d = new Date(today);
+                d.setDate(today.getDate() - i);
+                days.push({
+                    iso: formatDateISO(d),
+                    shortDay: d.toLocaleDateString('en-US', { weekday: 'short' }),
+                    dayNum: d.getDate(),
+                    isToday: i === 0,
+                    fullLabel: d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
+                });
+            }
+            return days;
+        }
+
+        const weekDays = getRollingSevenDays();
+        let selectedDayIndex = 6; // Today
+        let activeCategory = 'All';
+        let activeTab = 'today';
+        let selectedModalEmoji = AVAILABLE_EMOJIS[0];
+        let selectedModalColor = 'indigo';
+        let habits = [];
+
+        /**************************************************************
+         * 4. DEFAULT 5 HABITS WITH REALISTIC 7-DAY HISTORY
+         **************************************************************/
+        function buildDefaultHabits() {
+            return [
+                {
+                    id: 'h1',
+                    name: 'Morning Strength & Mobility',
+                    category: 'Fitness',
+                    emoji: '🏋️',
+                    color: 'rose',
+                    targetPerWeek: 6,
+                    logs: {
+                        [getPastISO(8)]: true,
+                        [getPastISO(7)]: true,
+                        [getPastISO(6)]: true,
+                        [getPastISO(5)]: true,
+                        [getPastISO(4)]: false,
+                        [getPastISO(3)]: true,
+                        [getPastISO(2)]: true,
+                        [getPastISO(1)]: true,
+                        [getPastISO(0)]: true
+                    }
+                },
+                {
+                    id: 'h2',
+                    name: 'Hydrate 2.5L Pure Water',
+                    category: 'Health',
+                    emoji: '💧',
+                    color: 'sky',
+                    targetPerWeek: 7,
+                    logs: {
+                        [getPastISO(9)]: true,
+                        [getPastISO(8)]: true,
+                        [getPastISO(7)]: true,
+                        [getPastISO(6)]: true,
+                        [getPastISO(5)]: true,
+                        [getPastISO(4)]: true,
+                        [getPastISO(3)]: true,
+                        [getPastISO(2)]: true,
+                        [getPastISO(1)]: true,
+                        [getPastISO(0)]: true
+                    }
+                },
+                {
+                    id: 'h3',
+                    name: '15m Mindful Breathwork',
+                    category: 'Mindfulness',
+                    emoji: '🧘',
+                    color: 'emerald',
+                    targetPerWeek: 6,
+                    logs: {
+                        [getPastISO(6)]: true,
+                        [getPastISO(5)]: false,
+                        [getPastISO(4)]: true,
+                        [getPastISO(3)]: true,
+                        [getPastISO(2)]: true,
+                        [getPastISO(1)]: true,
+                        [getPastISO(0)]: false
+                    }
+                },
+                {
+                    id: 'h4',
+                    name: 'Deep Skill / Code Practice',
+                    category: 'Work/Skill',
+                    emoji: '💻',
+                    color: 'indigo',
+                    targetPerWeek: 5,
+                    logs: {
+                        [getPastISO(6)]: true,
+                        [getPastISO(5)]: true,
+                        [getPastISO(4)]: true,
+                        [getPastISO(3)]: false,
+                        [getPastISO(2)]: true,
+                        [getPastISO(1)]: true,
+                        [getPastISO(0)]: true
+                    }
+                },
+                {
+                    id: 'h5',
+                    name: 'Read 20 Pages Before Bed',
+                    category: 'Mindfulness',
+                    emoji: '📖',
+                    color: 'purple',
+                    targetPerWeek: 6,
+                    logs: {
+                        [getPastISO(6)]: false,
+                        [getPastISO(5)]: true,
+                        [getPastISO(4)]: true,
+                        [getPastISO(3)]: true,
+                        [getPastISO(2)]: false,
+                        [getPastISO(1)]: true,
+                        [getPastISO(0)]: false
+                    }
+                }
+            ];
+        }
+
+        /**************************************************************
+         * 5. STORAGE & THEME PERSISTENCE
+         **************************************************************/
+        function loadState() {
+            try {
+                const saved = localStorage.getItem(STORAGE_KEY);
+                habits = saved ? JSON.parse(saved) : buildDefaultHabits();
+                if (!saved) saveState();
+            } catch (e) {
+                habits = buildDefaultHabits();
+            }
+
+            try {
+                const savedPrefs = localStorage.getItem(PREFS_KEY);
+                if (savedPrefs) prefs = { ...prefs, ...JSON.parse(savedPrefs) };
+            } catch (e) {}
+
+            const savedTheme = localStorage.getItem(THEME_KEY) || 'dark';
+            applyTheme(savedTheme);
+            syncPrefsUI();
+        }
+
+        function saveState() {
+            try { localStorage.setItem(STORAGE_KEY, JSON.stringify(habits)); } catch (e) {}
+        }
+
+        function savePrefs() {
+            try { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); } catch (e) {}
+            syncPrefsUI();
+        }
+
+        function applyTheme(mode) {
+            const htmlEl = document.documentElement;
+            const iconEl = document.getElementById('theme-icon');
+            const metaTheme = document.getElementById('meta-theme-color');
+            if (mode === 'dark') {
+                htmlEl.classList.add('dark');
+                iconEl.className = 'ph-fill ph-sun text-lg text-amber-400';
+                if (metaTheme) metaTheme.setAttribute('content', '#0f172a');
+            } else {
+                htmlEl.classList.remove('dark');
+                iconEl.className = 'ph-fill ph-moon-stars text-lg text-indigo-600';
+                if (metaTheme) metaTheme.setAttribute('content', '#f8fafc');
+            }
+            localStorage.setItem(THEME_KEY, mode);
+        }
+
+        function toggleTheme() {
+            triggerHaptic(12);
+            const isDark = document.documentElement.classList.contains('dark');
+            applyTheme(isDark ? 'light' : 'dark');
+        }
+
+        function toggleSound() {
+            prefs.sound = !prefs.sound;
+            if (prefs.sound) playSoundEffect('check');
+            savePrefs();
+            showToast(prefs.sound ? 'Sound Effects ON' : 'Sound Effects Muted');
+        }
+
+        function toggleHaptics() {
+            prefs.haptics = !prefs.haptics;
+            if (prefs.haptics) triggerHaptic(30);
+            savePrefs();
+            showToast(prefs.haptics ? 'Haptic Vibration ON' : 'Haptics Disabled');
+        }
+
+        function toggleReminder() {
+            prefs.reminderEnabled = !prefs.reminderEnabled;
+            triggerHaptic(15);
+            if (prefs.reminderEnabled && 'Notification' in window && Notification.permission === 'default') {
+                Notification.requestPermission();
+            }
+            savePrefs();
+            showToast(prefs.reminderEnabled ? `Daily reminder set for ${prefs.reminderTime}` : 'Daily reminder paused');
+        }
+
+        function saveReminderTime() {
+            const val = document.getElementById('reminder-time-input').value;
+            if (val) {
+                prefs.reminderTime = val;
+                savePrefs();
+                if (prefs.reminderEnabled) showToast(`Reminder updated to ${val}`);
+            }
+        }
+
+        function syncPrefsUI() {
+            const soundIcon = document.getElementById('sound-icon');
+            if (soundIcon) {
+                soundIcon.className = prefs.sound
+                    ? 'ph-fill ph-speaker-high text-lg text-brand-500'
+                    : 'ph-fill ph-speaker-slash text-lg text-slate-400';
+            }
+
+            const setSwitch = (id, state) => {
+                const btn = document.getElementById(id);
+                if (!btn) return;
+                btn.className = state
+                    ? 'w-12 h-7 rounded-full bg-brand-600 p-1 transition-colors flex items-center justify-end'
+                    : 'w-12 h-7 rounded-full bg-slate-300 dark:bg-slate-700 p-1 transition-colors flex items-center justify-start';
+            };
+            setSwitch('pref-sound-btn', prefs.sound);
+            setSwitch('pref-haptic-btn', prefs.haptics);
+            setSwitch('pref-reminder-btn', prefs.reminderEnabled);
+
+            const timeInput = document.getElementById('reminder-time-input');
+            if (timeInput && prefs.reminderTime) timeInput.value = prefs.reminderTime;
+        }
+
+        /**************************************************************
+         * 6. STREAK & COMPLETION CALCULATIONS
+         **************************************************************/
+        function calculateStreak(habit) {
+            let streak = 0;
+            let cursor = 0;
+            if (!habit.logs || !habit.logs[getPastISO(0)]) {
+                cursor = 1;
+            }
+            while (cursor < 365) {
+                const iso = getPastISO(cursor);
+                if (habit.logs && habit.logs[iso]) {
+                    streak++;
+                    cursor++;
+                } else {
+                    break;
+                }
+            }
+            return streak;
+        }
+
+        function calculateWeeklyCount(habit) {
+            return weekDays.reduce((acc, d) => acc + (habit.logs && habit.logs[d.iso] ? 1 : 0), 0);
+        }
+
+        function getDayCompletionStats(isoDate) {
+            const total = habits.length;
+            if (total === 0) return { completed: 0, total: 0, pct: 0 };
+            const completed = habits.filter(h => h.logs && h.logs[isoDate]).length;
+            const pct = Math.round((completed / total) * 100);
+            return { completed, total, pct };
+        }
+
+        function getBestOverallStreak() {
+            let best = 0;
+            habits.forEach(h => {
+                const s = calculateStreak(h);
+                if (s > best) best = s;
+            });
+            return best;
+        }
+
+        /**************************************************************
+         * 7. RENDERING ENGINE
+         **************************************************************/
+        function renderAll() {
+            renderHeaderAndHero();
+            renderMiniWeekStrip();
+            renderCategoryFilters();
+            renderHabitsList();
+            renderWeeklyView();
+            renderStatsView();
+        }
+
+        function renderHeaderAndHero() {
+            const activeDay = weekDays[selectedDayIndex];
+            document.getElementById('header-date').textContent = activeDay.isToday ? `Today • ${activeDay.fullLabel}` : activeDay.fullLabel;
+            document.getElementById('hero-best-streak').textContent = getBestOverallStreak();
+
+            const { completed, total, pct } = getDayCompletionStats(activeDay.iso);
+            const circumference = 163.36;
+            const offset = circumference - (pct / 100) * circumference;
+
+            document.getElementById('header-progress-ring').style.strokeDashoffset = offset;
+            document.getElementById('header-progress-text').textContent = `${pct}%`;
+
+            const dayWord = activeDay.isToday ? 'today' : `on ${activeDay.shortDay}`;
+            document.getElementById('daily-count-subtext').textContent = `${completed} of ${total} daily goals logged ${dayWord}`;
+
+            const badgeEl = document.getElementById('daily-status-badge');
+            const motEl = document.getElementById('daily-motivation');
+
+            if (total === 0) {
+                badgeEl.textContent = 'Start Now';
+                motEl.textContent = 'Tap + to create your first habit!';
+            } else if (pct === 100) {
+                badgeEl.textContent = 'Perfect Day 🎉';
+                motEl.textContent = 'All goals crushed! Streak powered up.';
+            } else if (pct >= 60) {
+                badgeEl.textContent = 'On Fire 🔥';
+                motEl.textContent = 'Almost there! Keep that streak alive.';
+            } else if (pct > 0) {
+                badgeEl.textContent = 'In Motion';
+                motEl.textContent = 'Great momentum, check off the next one!';
+            } else {
+                badgeEl.textContent = 'Ready to Log';
+                motEl.textContent = 'One tap to log your daily habits.';
+            }
+        }
+
+        function renderMiniWeekStrip() {
+            const strip = document.getElementById('mini-week-strip');
+            const activeDay = weekDays[selectedDayIndex];
+            const label = document.getElementById('active-date-label');
+            const resetBtn = document.getElementById('reset-to-today-btn');
+
+            if (activeDay.isToday) {
+                label.textContent = 'Logging for Today';
+                resetBtn.classList.add('hidden');
+            } else {
+                label.textContent = `Inspecting ${activeDay.fullLabel}`;
+                resetBtn.classList.remove('hidden');
+            }
+
+            strip.innerHTML = weekDays.map((d, idx) => {
+                const isSelected = idx === selectedDayIndex;
+                const stats = getDayCompletionStats(d.iso);
+                const dotColor = stats.pct === 100
+                    ? 'bg-emerald-400'
+                    : stats.pct > 0
+                        ? 'bg-amber-400'
+                        : 'bg-slate-300 dark:bg-slate-600';
+
+                return `
+                    <button onclick="selectDayIndex(${idx})" class="tap-scale flex flex-col items-center py-1.5 rounded-xl transition ${
+                        isSelected
+                            ? 'bg-brand-600 text-white shadow-md shadow-brand-600/30'
+                            : 'text-slate-600 dark:text-slate-400 hover:bg-white/60 dark:hover:bg-slate-700/50'
+                    }">
+                        <span class="text-[9px] font-extrabold uppercase opacity-80">${d.shortDay}</span>
+                        <span class="text-xs font-black mt-0.5">${d.dayNum}</span>
+                        <span class="w-1.5 h-1.5 rounded-full mt-1 ${isSelected ? 'bg-white' : dotColor}"></span>
+                    </button>
+                `;
+            }).join('');
+        }
+
+        function renderCategoryFilters() {
+            const categories = ['All', 'Fitness', 'Health', 'Mindfulness', 'Work/Skill'];
+            const container = document.getElementById('category-filters');
+            container.innerHTML = categories.map(cat => {
+                const isActive = activeCategory === cat;
+                return `
+                    <button onclick="setCategoryFilter('${cat}')" class="tap-scale px-3.5 py-1.5 rounded-full text-xs font-extrabold whitespace-nowrap transition ${
+                        isActive
+                            ? 'bg-brand-600 text-white shadow-xs shadow-brand-500/30'
+                            : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200/80 dark:border-slate-700/70'
+                    }">
+                        ${cat}
+                    </button>
+                `;
+            }).join('');
+        }
+
+        function renderHabitsList() {
+            const listEl = document.getElementById('habits-list');
+            const activeIso = weekDays[selectedDayIndex].iso;
+
+            const filtered = activeCategory === 'All'
+                ? habits
+                : habits.filter(h => h.category === activeCategory);
+
+            document.getElementById('filtered-count-badge').textContent = filtered.length;
+
+            if (filtered.length === 0) {
+                listEl.innerHTML = `
+                    <div class="bg-white dark:bg-slate-800/60 rounded-3xl p-7 text-center border border-dashed border-slate-300 dark:border-slate-700">
+                        <div class="text-3xl mb-2">✨</div>
+                        <p class="text-sm font-extrabold text-slate-800 dark:text-slate-200">No habits in this category</p>
+                        <p class="text-xs text-slate-500 dark:text-slate-400 mt-1 mb-4">Tap below to create a custom daily goal.</p>
+                        <button onclick="openHabitModal()" class="tap-scale px-4 py-2 rounded-xl bg-brand-600 text-white text-xs font-extrabold">+ Create Habit</button>
+                    </div>
+                `;
+                return;
+            }
+
+            listEl.innerHTML = filtered.map(habit => {
+                const isDone = !!(habit.logs && habit.logs[activeIso]);
+                const streak = calculateStreak(habit);
+                const weeklyCount = calculateWeeklyCount(habit);
+                const accent = ACCENT_COLORS[habit.color] || ACCENT_COLORS.indigo;
+
+                // Mini 7-day dot strip for each card
+                const miniDotsHtml = weekDays.map((d, i) => {
+                    const completedOnDay = !!(habit.logs && habit.logs[d.iso]);
+                    const isCurrentSelected = i === selectedDayIndex;
+                    return `<span title="${d.shortDay}" class="w-2 h-2 rounded-full transition-all ${
+                        completedOnDay
+                            ? accent.bar
+                            : 'bg-slate-200 dark:bg-slate-700'
+                    } ${isCurrentSelected ? 'ring-2 ring-offset-1 ring-brand-400 dark:ring-offset-slate-800' : ''}"></span>`;
+                }).join('');
+
+                return `
+                    <div class="bg-white dark:bg-slate-800/90 rounded-2xl p-3.5 border transition-all duration-200 flex items-center justify-between gap-3 ${
+                        isDone
+                            ? 'border-emerald-500/40 dark:border-emerald-500/30 bg-emerald-50/25 dark:bg-emerald-950/10'
+                            : 'border-slate-200/80 dark:border-slate-800 shadow-xs'
+                    }">
+                        <!-- Left Emoji Badge + Info + Mini 7-Day Dots (Tap to Edit) -->
+                        <div onclick="openHabitModal('${habit.id}')" class="flex items-center gap-3 flex-1 min-w-0 cursor-pointer active:opacity-80">
+                            <div class="w-12 h-12 rounded-2xl ${accent.bg} border ${accent.border} flex items-center justify-center shrink-0 text-2xl shadow-2xs">
+                                ${habit.emoji || '🎯'}
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <div class="flex items-center gap-1.5 flex-wrap">
+                                    <span class="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-md ${accent.bg} ${accent.text}">${escapeHtml(habit.category)}</span>
+                                    <span class="text-[10px] font-extrabold px-1.5 py-0.5 rounded-md ${
+                                        streak > 0 ? 'bg-orange-500/15 text-orange-500' : 'bg-slate-100 dark:bg-slate-700/60 text-slate-400'
+                                    }">
+                                        <span class="${streak > 0 ? 'flame-active' : ''}">🔥</span> ${streak}d
+                                    </span>
+                                    <span class="text-[10px] font-bold text-slate-400 dark:text-slate-500">${weeklyCount}/${habit.targetPerWeek} wk</span>
+                                </div>
+                                <h3 class="text-sm font-extrabold truncate mt-1 transition ${
+                                    isDone ? 'line-through text-slate-400 dark:text-slate-500' : 'text-slate-900 dark:text-white'
+                                }">${escapeHtml(habit.name)}</h3>
+
+                                <!-- Mini 7-Day Streak Dots on Card -->
+                                <div class="flex items-center gap-1.5 mt-1.5">
+                                    <div class="flex items-center gap-1">
+                                        ${miniDotsHtml}
+                                    </div>
+                                    <span class="text-[10px] font-semibold text-slate-400 dark:text-slate-500 ml-1">Last 7d</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right One-Tap Check Button -->
+                        <button onclick="toggleHabitCompletion('${habit.id}', '${activeIso}', event)" aria-label="Toggle ${escapeHtml(habit.name)}" class="tap-scale w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 transition-all ${
+                            isDone
+                                ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/30 animate-check'
+                                : 'bg-slate-100 dark:bg-slate-700/70 text-slate-400 dark:text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700'
+                        }">
+                            <i class="ph-bold ${isDone ? 'ph-check text-2xl' : 'ph-circle text-2xl opacity-40'}"></i>
+                        </button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderWeeklyView() {
+            const chartContainer = document.getElementById('weekly-bar-chart');
+            const labelsContainer = document.getElementById('weekly-bar-labels');
+
+            let totalPctSum = 0;
+            let bestDayPct = -1;
+            let bestDayName = 'Today';
+
+            chartContainer.innerHTML = weekDays.map((d, idx) => {
+                const { pct } = getDayCompletionStats(d.iso);
+                totalPctSum += pct;
+                if (pct >= bestDayPct) {
+                    bestDayPct = pct;
+                    bestDayName = d.isToday ? 'Today' : d.shortDay;
+                }
+                const barHeight = Math.max(pct, 8);
+                const isSelected = idx === selectedDayIndex;
+
+                const barColor = pct === 100
+                    ? 'bg-gradient-to-t from-emerald-600 to-emerald-400'
+                    : pct >= 50
+                        ? 'bg-gradient-to-t from-brand-600 to-indigo-400'
+                        : pct > 0
+                            ? 'bg-gradient-to-t from-amber-500 to-amber-400'
+                            : 'bg-slate-200 dark:bg-slate-700';
+
+                return `
+                    <div onclick="selectDayAndGoToday(${idx})" class="tap-scale flex-1 h-full flex flex-col justify-end items-center group cursor-pointer">
+                        <span class="text-[10px] font-extrabold mb-1 ${
+                            pct === 100 ? 'text-emerald-500' : 'text-slate-400 dark:text-slate-500'
+                        }">${pct}%</span>
+                        <div class="w-full max-w-[30px] bg-slate-100 dark:bg-slate-800 rounded-t-xl h-28 flex items-end p-0.5 overflow-hidden">
+                            <div class="w-full rounded-t-lg bar-fill ${barColor} ${isSelected ? 'ring-2 ring-brand-400' : ''}" style="height: ${barHeight}%"></div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            labelsContainer.innerHTML = weekDays.map((d) => `
+                <div class="text-[11px] font-extrabold ${d.isToday ? 'text-brand-600 dark:text-brand-400' : 'text-slate-500 dark:text-slate-400'}">
+                    ${d.shortDay}
+                </div>
+            `).join('');
+
+            const avgPct = Math.round(totalPctSum / 7);
+            document.getElementById('weekly-avg-badge').textContent = `${avgPct}%`;
+            document.getElementById('weekly-best-day').textContent = `${bestDayName} (${bestDayPct}%)`;
+            document.getElementById('weekly-top-streak').textContent = `🔥 ${getBestOverallStreak()}d`;
+
+            // Render 7-Day Interactive Habit Matrix
+            const headerRow = document.getElementById('matrix-header-row');
+            headerRow.innerHTML = `
+                <th class="py-2 pr-2">Habit</th>
+                ${weekDays.map(d => `<th class="py-2 px-1 text-center ${d.isToday ? 'text-brand-600 dark:text-brand-400' : ''}">${d.shortDay.slice(0, 2)}</th>`).join('')}
+            `;
+
+            const matrixBody = document.getElementById('matrix-body');
+            matrixBody.innerHTML = habits.map(habit => {
+                const accent = ACCENT_COLORS[habit.color] || ACCENT_COLORS.indigo;
+                return `
+                    <tr>
+                        <td class="py-2.5 pr-2 max-w-[115px]">
+                            <div class="flex items-center gap-1.5">
+                                <span class="w-6 h-6 rounded-lg ${accent.bg} flex items-center justify-center shrink-0 text-xs">
+                                    ${habit.emoji || '🎯'}
+                                </span>
+                                <span class="text-xs font-bold truncate text-slate-800 dark:text-slate-200">${escapeHtml(habit.name)}</span>
+                            </div>
+                        </td>
+                        ${weekDays.map(d => {
+                            const done = !!(habit.logs && habit.logs[d.iso]);
+                            return `
+                                <td class="py-2 px-0.5 text-center">
+                                    <button onclick="toggleHabitCompletion('${habit.id}', '${d.iso}', event)" class="tap-scale w-7 h-7 rounded-lg inline-flex items-center justify-center transition ${
+                                        done
+                                            ? 'bg-emerald-500 text-white shadow-2xs shadow-emerald-500/30'
+                                            : 'bg-slate-100 dark:bg-slate-700/60 text-transparent'
+                                    }">
+                                        <i class="ph-bold ph-check text-xs"></i>
+                                    </button>
+                                </td>
+                            `;
+                        }).join('')}
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function renderStatsView() {
+            let bestStreak = getBestOverallStreak();
+            let totalCompletedAllTime = 0;
+            let weeklyCheckins = 0;
+
+            habits.forEach(h => {
+                if (h.logs) {
+                    totalCompletedAllTime += Object.values(h.logs).filter(Boolean).length;
+                }
+                weeklyCheckins += calculateWeeklyCount(h);
+            });
+
+            const maxPossibleWeekly = habits.length * 7;
+            const weeklyRate = maxPossibleWeekly > 0 ? Math.round((weeklyCheckins / maxPossibleWeekly) * 100) : 0;
+
+            document.getElementById('stat-best-streak').textContent = `${bestStreak}d`;
+            document.getElementById('stat-weekly-rate').textContent = `${weeklyRate}%`;
+            document.getElementById('stat-total-done').textContent = totalCompletedAllTime;
+
+            const breakdownEl = document.getElementById('stats-habit-breakdown');
+            breakdownEl.innerHTML = habits.map(h => {
+                const count = calculateWeeklyCount(h);
+                const target = h.targetPerWeek || 7;
+                const pct = Math.min(100, Math.round((count / target) * 100));
+                const accent = ACCENT_COLORS[h.color] || ACCENT_COLORS.indigo;
+
+                return `
+                    <div class="space-y-1.5">
+                        <div class="flex items-center justify-between text-xs">
+                            <span class="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5 truncate pr-2">
+                                <span>${h.emoji || '🎯'}</span>
+                                <span class="truncate">${escapeHtml(h.name)}</span>
+                            </span>
+                            <span class="font-extrabold shrink-0 ${pct >= 100 ? 'text-emerald-500' : 'text-slate-500 dark:text-slate-400'}">${count}/${target}d (${pct}%)</span>
+                        </div>
+                        <div class="w-full h-2 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
+                            <div class="h-full rounded-full transition-all duration-500 ${pct >= 100 ? 'bg-emerald-500' : accent.bar}" style="width: ${pct}%"></div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            const categories = ['Fitness', 'Health', 'Mindfulness', 'Work/Skill'];
+            const catListEl = document.getElementById('stats-category-list');
+            catListEl.innerHTML = categories.map(cat => {
+                const catHabits = habits.filter(h => h.category === cat);
+                const checkins = catHabits.reduce((sum, h) => sum + calculateWeeklyCount(h), 0);
+                return `
+                    <div class="p-3 rounded-2xl bg-slate-100/80 dark:bg-slate-700/40 border border-slate-200/60 dark:border-slate-700 flex items-center justify-between">
+                        <span class="text-xs font-extrabold text-slate-700 dark:text-slate-200">${cat}</span>
+                        <span class="text-xs font-black text-brand-600 dark:text-brand-400">${checkins} logs</span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        /**************************************************************
+         * 8. USER INTERACTIONS, SOUND, HAPTICS & CONFETTI
+         **************************************************************/
+        function toggleHabitCompletion(habitId, isoDate, event) {
+            const habit = habits.find(h => h.id === habitId);
+            if (!habit) return;
+            if (!habit.logs) habit.logs = {};
+
+            const newState = !habit.logs[isoDate];
+            habit.logs[isoDate] = newState;
+
+            if (newState) {
+                const statsAfter = getDayCompletionStats(isoDate);
+                if (statsAfter.pct === 100) {
+                    playSoundEffect('fanfare');
+                    triggerHaptic([25, 50, 40]);
+                } else {
+                    playSoundEffect('check');
+                    triggerHaptic(20);
+                }
+
+                if (event && event.currentTarget) {
+                    const rect = event.currentTarget.getBoundingClientRect();
+                    spawnConfettiBurst(rect.left + rect.width / 2, rect.top + rect.height / 2);
+                }
+            } else {
+                playSoundEffect('uncheck');
+                triggerHaptic(10);
+            }
+
+            saveState();
+            renderAll();
+        }
+
+        function selectDayIndex(idx) {
+            triggerHaptic(10);
+            selectedDayIndex = idx;
+            renderAll();
+        }
+
+        function selectDayAndGoToday(idx) {
+            triggerHaptic(15);
+            selectedDayIndex = idx;
+            switchTab('today');
+            renderAll();
+        }
+
+        function setCategoryFilter(cat) {
+            triggerHaptic(10);
+            activeCategory = cat;
+            renderCategoryFilters();
+            renderHabitsList();
+        }
+
+        function switchTab(tabName) {
+            triggerHaptic(12);
+            activeTab = tabName;
+            const views = ['today', 'weekly', 'stats', 'settings'];
+            views.forEach(v => {
+                const section = document.getElementById(`view-${v}`);
+                const navBtn = document.getElementById(`nav-${v}`);
+                if (v === tabName) {
+                    section.classList.remove('hidden');
+                    navBtn.className = 'tap-scale flex-1 flex flex-col items-center gap-0.5 py-1 rounded-2xl text-brand-600 dark:text-brand-400 font-extrabold transition';
+                } else {
+                    section.classList.add('hidden');
+                    navBtn.className = 'tap-scale flex-1 flex flex-col items-center gap-0.5 py-1 rounded-2xl text-slate-400 dark:text-slate-500 font-semibold transition';
+                }
+            });
+            document.getElementById('main-scroll').scrollTop = 0;
+            renderAll();
+        }
+
+        /**************************************************************
+         * 9. NATIVE BOTTOM SHEET MODALS (HABIT CRUD & PWA INSTALL)
+         **************************************************************/
+        function handleBackdropClick(event, modalId) {
+            if (event.target.id === modalId) {
+                document.getElementById(modalId).classList.add('hidden');
+            }
+        }
+
+        function renderEmojiAndColorPickers() {
+            const emojiGrid = document.getElementById('emoji-picker-grid');
+            emojiGrid.innerHTML = AVAILABLE_EMOJIS.map(emoji => {
+                const isSelected = emoji === selectedModalEmoji;
+                return `
+                    <button type="button" onclick="selectModalEmoji('${emoji}')" class="tap-scale h-11 rounded-2xl flex items-center justify-center text-xl transition ${
+                        isSelected
+                            ? 'bg-brand-600 text-white shadow-md shadow-brand-500/30 scale-105 ring-2 ring-brand-400'
+                            : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200'
+                    }">
+                        ${emoji}
+                    </button>
+                `;
+            }).join('');
+
+            const colorGrid = document.getElementById('color-picker-grid');
+            colorGrid.innerHTML = Object.keys(ACCENT_COLORS).map(colorKey => {
+                const c = ACCENT_COLORS[colorKey];
+                const isSelected = colorKey === selectedModalColor;
+                return `
+                    <button type="button" onclick="selectModalColor('${colorKey}')" class="tap-scale flex-1 h-9 rounded-xl ${c.bar} flex items-center justify-center text-white transition ${
+                        isSelected ? 'ring-2 ring-offset-2 ring-slate-900 dark:ring-white dark:ring-offset-slate-900 scale-105' : 'opacity-65'
+                    }">
+                        ${isSelected ? '<i class="ph-bold ph-check text-sm"></i>' : ''}
+                    </button>
+                `;
+            }).join('');
+        }
+
+        function selectModalEmoji(emoji) {
+            triggerHaptic(8);
+            selectedModalEmoji = emoji;
+            renderEmojiAndColorPickers();
+        }
+
+        function selectModalColor(colorKey) {
+            triggerHaptic(8);
+            selectedModalColor = colorKey;
+            renderEmojiAndColorPickers();
+        }
+
+        function openHabitModal(habitId = null) {
+            triggerHaptic(15);
+            const modal = document.getElementById('habit-modal');
+            const titleEl = document.getElementById('modal-title');
+            const idInput = document.getElementById('habit-id-input');
+            const nameInput = document.getElementById('habit-name-input');
+            const catInput = document.getElementById('habit-category-input');
+            const targetInput = document.getElementById('habit-target-input');
+            const deleteBtn = document.getElementById('delete-habit-btn');
+
+            if (habitId) {
+                const habit = habits.find(h => h.id === habitId);
+                if (!habit) return;
+                titleEl.textContent = 'Edit Habit Goal';
+                idInput.value = habit.id;
+                nameInput.value = habit.name;
+                catInput.value = habit.category;
+                targetInput.value = String(habit.targetPerWeek || 7);
+                selectedModalEmoji = habit.emoji || AVAILABLE_EMOJIS[0];
+                selectedModalColor = habit.color || 'indigo';
+                deleteBtn.classList.remove('hidden');
+            } else {
+                titleEl.textContent = 'New Daily Habit';
+                idInput.value = '';
+                nameInput.value = '';
+                catInput.value = 'Fitness';
+                targetInput.value = '7';
+                selectedModalEmoji = AVAILABLE_EMOJIS[0];
+                selectedModalColor = 'indigo';
+                deleteBtn.classList.add('hidden');
+            }
+
+            renderEmojiAndColorPickers();
+            modal.classList.remove('hidden');
+        }
+
+        function closeHabitModal() {
+            document.getElementById('habit-modal').classList.add('hidden');
+        }
+
+        function saveHabitForm(event) {
+            event.preventDefault();
+            const id = document.getElementById('habit-id-input').value;
+            const name = document.getElementById('habit-name-input').value.trim();
+            const category = document.getElementById('habit-category-input').value;
+            const targetPerWeek = parseInt(document.getElementById('habit-target-input').value, 10);
+
+            if (!name) return;
+
+            if (id) {
+                const existing = habits.find(h => h.id === id);
+                if (existing) {
+                    existing.name = name;
+                    existing.category = category;
+                    existing.targetPerWeek = targetPerWeek;
+                    existing.emoji = selectedModalEmoji;
+                    existing.color = selectedModalColor;
+                    showToast('Habit updated!');
+                }
+            } else {
+                habits.unshift({
+                    id: 'h_' + Date.now(),
+                    name,
+                    category,
+                    emoji: selectedModalEmoji,
+                    color: selectedModalColor,
+                    targetPerWeek,
+                    logs: {}
+                });
+                showToast('New habit created!');
+            }
+
+            playSoundEffect('check');
+            triggerHaptic(20);
+            saveState();
+            closeHabitModal();
+            renderAll();
+        }
+
+        function handleDeleteCurrentHabit() {
+            const id = document.getElementById('habit-id-input').value;
+            if (!id) return;
+            habits = habits.filter(h => h.id !== id);
+            triggerHaptic(25);
+            saveState();
+            closeHabitModal();
+            renderAll();
+            showToast('Habit deleted');
+        }
+
+        function openInstallSheet() {
+            triggerHaptic(12);
+            document.getElementById('install-modal').classList.remove('hidden');
+        }
+
+        function closeInstallSheet() {
+            document.getElementById('install-modal').classList.add('hidden');
+        }
+
+        /**************************************************************
+         * 10. DATA BACKUP / RESTORE (JSON) & DEMO ACTIONS
+         **************************************************************/
+        function exportDataJSON() {
+            triggerHaptic(15);
+            const payload = {
+                app: 'HabitPulse',
+                exportedAt: new Date().toISOString(),
+                habits,
+                prefs
+            };
+            const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `habitpulse-backup-${formatDateISO(new Date())}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast('Backup JSON exported!');
+        }
+
+        function importDataJSON(event) {
+            const file = event.target.files && event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const parsed = JSON.parse(e.target.result);
+                    if (Array.isArray(parsed.habits)) {
+                        habits = parsed.habits;
+                        saveState();
+                        renderAll();
+                        playSoundEffect('fanfare');
+                        showToast('Backup restored successfully!');
+                    } else {
+                        showToast('Invalid backup file format');
+                    }
+                } catch (err) {
+                    showToast('Could not parse JSON file');
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = '';
+        }
+
+        function resetDemoData() {
+            triggerHaptic(25);
+            habits = buildDefaultHabits();
+            selectedDayIndex = 6;
+            activeCategory = 'All';
+            saveState();
+            renderAll();
+            showToast('Default 7-day demo restored!');
+        }
+
+        function completeAllToday() {
+            const activeIso = weekDays[selectedDayIndex].iso;
+            habits.forEach(h => {
+                if (!h.logs) h.logs = {};
+                h.logs[activeIso] = true;
+            });
+            saveState();
+            renderAll();
+            playSoundEffect('fanfare');
+            triggerHaptic([25, 50, 40]);
+            spawnConfettiBurst(window.innerWidth / 2, window.innerHeight / 3);
+            showToast('All goals completed!');
+        }
+
+        /**************************************************************
+         * 11. TOAST & CONFETTI PARTICLE ENGINE
+         **************************************************************/
+        let toastTimeout = null;
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toast-msg').textContent = message;
+            toast.classList.remove('opacity-0', 'translate-y-2');
+            toast.classList.add('opacity-100', 'translate-y-0');
+
+            clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                toast.classList.remove('opacity-100', 'translate-y-0');
+                toast.classList.add('opacity-0', 'translate-y-2');
+            }, 2200);
+        }
+
+        const confettiCanvas = document.getElementById('confetti-canvas');
+        const ctx = confettiCanvas.getContext('2d');
+        let particles = [];
+        let animFrameId = null;
+
+        function resizeConfettiCanvas() {
+            confettiCanvas.width = window.innerWidth;
+            confettiCanvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeConfettiCanvas);
+        resizeConfettiCanvas();
+
+        function spawnConfettiBurst(x, y) {
+            const colors = ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#38bdf8', '#a855f7'];
+            for (let i = 0; i < 28; i++) {
+                const angle = (Math.PI * 2 * i) / 28 + (Math.random() - 0.5) * 0.4;
+                const speed = 3 + Math.random() * 5.5;
+                particles.push({
+                    x,
+                    y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed - 2,
+                    size: 4 + Math.random() * 4,
+                    color: colors[Math.floor(Math.random() * colors.length)],
+                    alpha: 1,
+                    rotation: Math.random() * 360,
+                    vRot: (Math.random() - 0.5) * 12
+                });
+            }
+            if (!animFrameId) animateConfetti();
+        }
+
+        function animateConfetti() {
+            ctx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+            particles.forEach((p) => {
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vy += 0.22;
+                p.alpha -= 0.022;
+                p.rotation += p.vRot;
+
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, p.alpha);
+                ctx.translate(p.x, p.y);
+                ctx.rotate((p.rotation * Math.PI) / 180);
+                ctx.fillStyle = p.color;
+                ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.7);
+                ctx.restore();
+            });
+
+            particles = particles.filter(p => p.alpha > 0);
+            if (particles.length > 0) {
+                animFrameId = requestAnimationFrame(animateConfetti);
+            } else {
+                animFrameId = null;
+                ctx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+            }
+        }
+
+        function escapeHtml(str) {
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        // Initialize Native PWA App on Load
+        window.onload = function () {
+            initPWAManifest();
+            updateStatusBarClock();
+            setInterval(updateStatusBarClock, 15000);
+            loadState();
+            renderAll();
+        };
+    </script>
+</body>
+</html>
